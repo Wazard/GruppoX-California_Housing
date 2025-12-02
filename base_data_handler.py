@@ -3,7 +3,6 @@ import numpy as np
 import re
 import warnings
 import matplotlib.pyplot as plt
-import matplotlib.figure as figure
 import seaborn as sns
 
 class BaseDataHandler():
@@ -249,17 +248,23 @@ class BaseDataHandler():
     def _try_clean_column_names(df) -> tuple[bool, Exception | pd.DataFrame]:
         '''
         Static version: cleans column names on any DataFrame.
+        Converts CamelCase or mixed styles into snake_case.
         '''
         def to_snake(name: str) -> str:
+            # Insert underscore before capital letters (CamelCase → snake_case)
+            name = re.sub(r'(?<!^)(?=[A-Z])', '_', name)
+            # Lowercase and replace non-alphanumeric with underscores
             name = name.lower()
             name = re.sub(r'[^a-z0-9]+', '_', name)
-            name = name.strip('_')
-            return name
+            # Strip leading/trailing underscores
+            return name.strip('_')
+
         try:
             cleaned_df = df.rename(columns={col: to_snake(col) for col in df.columns})
         except Exception as e:
             return False, e
         return True, cleaned_df
+
 
     def try_rename_col(self, col: str | list[str], name: str | list[str], inplace=True) -> tuple[bool, Exception | pd.DataFrame | None]:
         '''
@@ -327,41 +332,40 @@ class BaseDataHandler():
         except Exception as e:
             print(e)
             return None
-        return self.df[numeric_cols]
+        return numeric_cols
     
-    def get_outlier_case_study(self, cols=3, width_mul=1,size_mul=1, method="percentile") -> tuple[figure.Figure, np.ndarray]:
-        outlier_flags = self.get_outliers_df(
-            method=method, lower_percentile=0.01, upper_percentile=0.99
-        )
-
+    def get_outlier_case_study(self, cols=3, width_mul=1, size_mul=1, method="percentile"):
+        """
+        Generate boxplots with outlier overlays for numeric columns.
+        
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+        axes : np.ndarray of matplotlib.axes.Axes (flattened)
+        """
+        outlier_flags = self.get_outliers_df(method=method, lower_percentile=0.01, upper_percentile=0.99)
         numeric_cols = self.try_get_numeric_cols()
 
-        n_rows = (len(numeric_cols) + 2) // cols
-        fig, axes = plt.subplots(
-            n_rows, cols, figsize=(18*size_mul*width_mul, 5*n_rows*size_mul)
-        )
-        axes = axes.flatten()
+        n_rows = (len(numeric_cols) + cols - 1) // cols
+        fig, axes = plt.subplots(n_rows, cols, figsize=(6*cols*width_mul, 5*n_rows*size_mul))
+        axes = np.atleast_1d(axes).flatten()
 
         for i, col in enumerate(numeric_cols):
             sns.boxplot(data=self.df, x=col, color="steelblue", ax=axes[i])
-
-            # Overlay outliers in red (only if they exist)
             new_mask = outlier_flags[col]
+
             if new_mask.any():
+                ymin, ymax = axes[i].get_ylim()
                 sns.scatterplot(
                     x=self.df[col][new_mask],
-                    y=[-0.05] * new_mask.sum(),   # jitter so they appear just above the box
-                    color="red",
-                    marker="o",
-                    ax=axes[i],
-                    label="outliers"
+                    y=[-0.05] * new_mask.sum(),
+                    color="red", marker="o", ax=axes[i], label="outliers"
                 )
                 axes[i].legend()
 
             axes[i].set_title(f"Outliers in {col} ({method})", fontsize=12)
 
-        # Remove unused subplots
-        for j in range(i+1, len(axes)):
+        for j in range(len(numeric_cols), len(axes)):
             fig.delaxes(axes[j])
 
         return fig, axes
