@@ -30,6 +30,10 @@ class BaseDataHandler():
     def df(self, df) -> None:
         self.__curr_df = df
     
+
+    def sample_df(self, amount = 1000) -> pd.DataFrame:
+        return self.df.sample(amount, random_state=42)
+    
     def df_log(self, base:float='e') -> pd.DataFrame:
         '''
         Apply logarithmic transformation to numeric columns of the DataFrame.
@@ -292,11 +296,11 @@ class BaseDataHandler():
             return False, e
 
 
-    def get_outliers_df(self, method: str = "iqr", lower_percentile: float = 0.01, upper_percentile: float = 0.99) -> pd.DataFrame:
+    def get_outliers_df(self, method: str = "percentile", lower_percentile: float = 0.01, upper_percentile: float = 0.99) -> pd.DataFrame:
         return BaseDataHandler._get_outliers_df(self.df, method, lower_percentile, upper_percentile)
     
     @staticmethod
-    def _get_outliers_df(df, method: str = "iqr", lower_percentile: float = 0.01, upper_percentile: float = 0.99) -> pd.DataFrame:
+    def _get_outliers_df(df, method: str = "percentile", lower_percentile: float = 0.01, upper_percentile: float = 0.99) -> pd.DataFrame:
         """
         Detect outliers for every numeric column in the DataFrame.
         Supports 'iqr', 'zscore', and 'percentile' methods.
